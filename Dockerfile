@@ -47,4 +47,7 @@ RUN (command -v git >/dev/null 2>&1 && git config --global --add safe.directory 
  && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 80
-CMD ["apache2-foreground"]
+# Startup: jalankan migration (idempotent, --force wajib di production) lalu Apache.
+# Guard "|| true" supaya boot TIDAK gagal kalau DB belum siap/tanpa migration —
+# app tetap hidup, migration menyusul di restart berikutnya. storage:link best-effort.
+CMD ["/bin/bash", "-c", "if [ -f artisan ]; then php artisan migrate --force --no-interaction || true; php artisan storage:link 2>/dev/null || true; fi; exec apache2-foreground"]
