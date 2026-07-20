@@ -19,11 +19,8 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN sed -ri 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
       /etc/apache2/sites-available/*.conf /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf \
- && a2enmod rewrite setenvif \
+ && a2enmod rewrite \
  && printf '%s\n' \
-      '# Di belakang proxy TLS (CapRover): kenali HTTPS dari X-Forwarded-Proto supaya' \
-      '# PHP/Laravel generate URL & form action https:// (cegah warning "not secure").' \
-      'SetEnvIf X-Forwarded-Proto "https" HTTPS=on' \
       '<Directory /var/www/html/public>' \
       '    Options Indexes FollowSymLinks' \
       '    AllowOverride All' \
@@ -50,11 +47,7 @@ RUN (command -v git >/dev/null 2>&1 && git config --global --add safe.directory 
  && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 80
-# Startup: migration + seed (auto-deteksi) lalu Apache.
-#  - migrate --force: terapkan migration (idempotent, --force wajib di production).
-#  - db:seed --force: auto-jalankan DatabaseSeeder KALAU ada isinya (default Laravel
-#    kosong = no-op). Guard "|| true" → seeder ber-unique-key gagal aman saat diulang
-#    (tidak menduplikat data, tidak menggagalkan boot). App tetap hidup walau DB
-#    sesaat belum siap; migration/seed menyusul di restart berikutnya.
-#  - storage:link best-effort.
-CMD ["/bin/bash", "-c", "if [ -f artisan ]; then php artisan migrate --force --no-interaction || true; php artisan db:seed --force --no-interaction || true; php artisan storage:link 2>/dev/null || true; fi; exec apache2-foreground"]
+# Startup: jalankan migration (idempotent, --force wajib di production) lalu Apache.
+# Guard "|| true" supaya boot TIDAK gagal kalau DB belum siap/tanpa migration —
+# app tetap hidup, migration menyusul di restart berikutnya. storage:link best-effort.
+CMD ["/bin/bash", "-c", "if [ -f artisan ]; then php artisan migrate --force --no-interaction || true; php artisan storage:link 2>/dev/null || true; fi; exec apache2-foreground"]
