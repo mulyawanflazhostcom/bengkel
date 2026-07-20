@@ -50,4 +50,4 @@ EXPOSE 80
 # Startup: jalankan migration (idempotent, --force wajib di production) lalu Apache.
 # Guard "|| true" supaya boot TIDAK gagal kalau DB belum siap/tanpa migration —
 # app tetap hidup, migration menyusul di restart berikutnya. storage:link best-effort.
-CMD ["/bin/bash", "-c", "if [ -f artisan ]; then php artisan migrate --force --no-interaction || true; php artisan db:seed --force --no-interaction || true; php artisan storage:link 2>/dev/null || true; fi; exec apache2-foreground"]
+CMD ["/bin/bash", "-c", "if [ -f artisan ]; then php artisan migrate --force --no-interaction || true; php artisan storage:link 2>/dev/null || true; fi; exec apache2-foreground"]
