@@ -1,0 +1,22 @@
+Buat sebuah sistem berbasis web dengan ketentuan sebagai berikut: 
+1.Tema: Sistem Informasi Bengkel
+2.Kelompok: 3 orang/kelompok → 5 kelompok 
+3.Deadline: Senin, 27 Juli 2026 (presentasi)
+4.Output: Aplikasi web + Laporan tertulis
+5.Minimal entitas sebagai berikut: 
+- Mekanik/admin
+- Pelanggan 
+- Kendaraan 
+- Transaksi (servis/penjualan)
+6.Minimal fitur sebagai berikut: 
+- Auth
+- CRUD
+7.API dengan sanctum dan minimum endpoint: 
+- GET /api/services — daftar transaksi servis (JSON)
+- GET /api/customers — daftar pelanggan (JSON)
+8.Tampilan responsive (mobile first)
+
+1	Fungsionalitas	CRUD berjalan, auth, relasi antar tabel, data tersimpan	40%
+2	Kualitas Kode	Struktur MVC, validasi input, Eloquent (bukan raw SQL), keamanan	20%
+3	Tampilan & UX	Responsive, konsisten, informatif, navigasi jelas	15%
+4	API & Keamanan	Endpoint JSON berfungsi, Sanctum token, response format	10%

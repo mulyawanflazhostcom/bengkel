@@ -1,0 +1,532 @@
+{
+	"info": {
+		"_postman_id": "bengkel-api-collection",
+		"name": "Bengkel API",
+		"description": "Koleksi Postman untuk Sistem Informasi Bengkel.\n\n## Cara Penggunaan\n1. **Variabel**: `base_url` → URL aplikasi (default: `http://localhost:8000`)\n2. **Auto-login**: Pre-request script akan otomatis login jika token kosong\n3. **Manual**: Jalankan **Login** dulu → token tersimpan otomatis ke variable `token`\n\n## Daftar Endpoint\n- **Auth**: Login, Logout\n- **User**: Get Authenticated User\n- **Customers**: Get All Customers\n- **Services**: Get All Services\n\n## Testing\nSetiap endpoint sudah dilengkapi test script (tab **Tests**) untuk memvalidasi response secara otomatis.\nJalankan dengan **Collection Runner** atau **Run All** untuk mengecek semua endpoint sekaligus.\n\n⚠️ Pastikan `base_url` sudah sesuai环境 (contoh: `http://localhost:8000` jika pakai `php artisan serve --port=8000`).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"lastUpdated": "2026-07-20T13:30:00+07:00"
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"exec": [
+					"// Auto-login jika token belum tersedia",
+					"var token = pm.collectionVariables.get('token');",
+					"var loginUrl = pm.collectionVariables.get('base_url') + '/api/login';",
+					"",
+					"if (!token || token === '') {",
+					"    console.log('Token kosong, mencoba login otomatis...');",
+					"    ",
+					"    var loginRequest = {",
+					"        url: loginUrl,",
+					"        method: 'POST',",
+					"        header: {",
+					"            'Content-Type': 'application/json',",
+					"            'Accept': 'application/json'",
+					"        },",
+					"        body: {",
+					"            mode: 'raw',",
+					"            raw: JSON.stringify({",
+					"                email: 'admin@bengkel.test',",
+					"                password: 'password'",
+					"            })",
+					"        }",
+					"    };",
+					"",
+					"    pm.sendRequest(loginRequest, function (err, res) {",
+					"        if (err) {",
+					"            console.log('Gagal auto-login:', err);",
+					"        } else {",
+					"            try {",
+					"                var json = res.json();",
+					"                if (json.success && json.data && json.data.token) {",
+					"                    pm.collectionVariables.set('token', json.data.token);",
+					"                    console.log('Auto-login berhasil, token tersimpan.');",
+					"                }",
+					"            } catch(e) {",
+					"                console.log('Gagal parse response auto-login:', e);",
+					"            }",
+					"        }",
+					"    });",
+					"}"
+				],
+				"type": "text/javascript"
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"description": "Endpoint untuk autentikasi menggunakan Laravel Sanctum.",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response format sukses', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json).to.have.property('success', true);",
+									"    pm.expect(json).to.have.property('message');",
+									"    pm.expect(json.message).to.include('Login berhasil');",
+									"});",
+									"",
+									"pm.test('Token dan data user tersedia', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.data).to.have.property('user');",
+									"    pm.expect(json.data.user).to.have.all.keys('id', 'name', 'email', 'role', 'phone', 'email_verified_at', 'created_at', 'updated_at');",
+									"    pm.expect(json.data).to.have.property('token');",
+									"    pm.expect(json.data.token).to.match(/^\\d+\\|/);",
+									"    pm.expect(json.data).to.have.property('token_type', 'Bearer');",
+									"});",
+									"",
+									"// Simpan token ke collection variable",
+									"var json = pm.response.json();",
+									"if (json.success && json.data && json.data.token) {",
+									"    pm.collectionVariables.set('token', json.data.token);",
+									"    console.log('Token berhasil disimpan:', json.data.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"admin@bengkel.test\",\n    \"password\": \"password\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "login"]
+						},
+						"description": "Login untuk mendapatkan token Sanctum.\n\n**Response sukses:**\n```json\n{\n    \"success\": true,\n    \"message\": \"Login berhasil.\",\n    \"data\": {\n        \"user\": { ... },\n        \"token\": \"1|abc123...\",\n        \"token_type\": \"Bearer\"\n    }\n}\n```\n\n**Response gagal:**\n```json\n{\n    \"success\": false,\n    \"message\": \"Email atau password salah.\"\n}\n```"
+					},
+					"response": [
+						{
+							"name": "Login Berhasil",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n    \"success\": true,\n    \"message\": \"Login berhasil.\",\n    \"data\": {\n        \"user\": {\n            \"id\": 1,\n            \"name\": \"Admin Bengkel\",\n            \"email\": \"admin@bengkel.test\",\n            \"role\": \"admin\",\n            \"phone\": \"081234567890\",\n            \"email_verified_at\": null,\n            \"created_at\": \"2026-07-20T06:30:00.000000Z\",\n            \"updated_at\": \"2026-07-20T06:30:00.000000Z\"\n        },\n        \"token\": \"1|abcdef1234567890abcdef1234567890abcdef12\",\n        \"token_type\": \"Bearer\"\n    }\n}"
+						},
+						{
+							"name": "Login Gagal",
+							"status": "Unauthorized",
+							"code": 401,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n    \"success\": false,\n    \"message\": \"Email atau password salah.\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Logout",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response format sukses', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json).to.have.property('success', true);",
+									"    pm.expect(json).to.have.property('message');",
+									"    pm.expect(json.message).to.include('Logout berhasil');",
+									"});",
+									"",
+									"// Hapus token dari variable setelah logout",
+									"pm.collectionVariables.set('token', '');",
+									"console.log('Token dihapus setelah logout.');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "{{base_url}}/api/logout",
+							"host": ["{{base_url}}"],
+							"path": ["api", "logout"]
+						},
+						"description": "Logout dan mencabut token yang sedang digunakan.\n\n**Response:**\n```json\n{\n    \"success\": true,\n    \"message\": \"Logout berhasil, token dicabut.\"\n}\n```"
+					},
+					"response": [
+						{
+							"name": "Logout Berhasil",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n    \"success\": true,\n    \"message\": \"Logout berhasil, token dicabut.\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "User",
+			"description": "Endpoint terkait user yang sedang login.",
+			"item": [
+				{
+					"name": "Get Authenticated User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Jika 401, langsung skip assertion data (token belum terisi)",
+									"if (pm.response.code === 401) {",
+									"    console.warn('⚠️ 401 Unauthenticated — pastikan Login sudah dijalankan atau token valid.');",
+									"    return;",
+									"}",
+									"",
+									"pm.test('Response format konsisten (success, message, data)', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json).to.have.property('success', true);",
+									"    pm.expect(json).to.have.property('message', 'Data user.');",
+									"    pm.expect(json).to.have.property('data');",
+									"});",
+									"",
+									"pm.test('Data user di dalam .data memiliki field valid', function () {",
+									"    var json = pm.response.json();",
+									"    var user = json.data;",
+									"    pm.expect(user).to.have.property('id');",
+									"    pm.expect(user).to.have.property('name');",
+									"    pm.expect(user).to.have.property('email');",
+									"    pm.expect(user).to.have.property('role');",
+									"    pm.expect(user.role).to.match(/^(admin|mekanik)$/);",
+									"    pm.expect(user).to.have.property('phone');",
+									"});",
+									"",
+									"pm.test('Email valid', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.data.email).to.match(/^[\\w.-]+@[\\w.-]+\\.\\w+$/);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Menunggu auto-login dari collection-level pre-request selesai",
+									"console.log('Memeriksa token untuk Get Authenticated User...');"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user"]
+						},
+						"description": "Mendapatkan data user yang sedang login berdasarkan token Sanctum."
+					},
+					"response": [
+						{
+							"name": "Data User",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n    \"success\": true,\n    \"message\": \"Data user.\",\n    \"data\": {\n        \"id\": 1,\n        \"name\": \"Admin Bengkel\",\n        \"email\": \"admin@bengkel.test\",\n        \"role\": \"admin\",\n        \"phone\": \"081234567890\",\n        \"email_verified_at\": null,\n        \"created_at\": \"2026-07-20T06:30:00.000000Z\",\n        \"updated_at\": \"2026-07-20T06:30:00.000000Z\"\n    }\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Customers",
+			"description": "Endpoint untuk mendapatkan data pelanggan.",
+			"item": [
+				{
+					"name": "Get All Customers",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Jika 401, langsung skip assertion data (token belum terisi)",
+									"if (pm.response.code === 401) {",
+									"    console.warn('⚠️ 401 Unauthenticated — pastikan Login sudah dijalankan atau token valid.');",
+									"    return;",
+									"}",
+									"",
+									"pm.test('Response format sukses', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json).to.have.property('success', true);",
+									"    pm.expect(json).to.have.property('message', 'Daftar pelanggan.');",
+									"    pm.expect(json).to.have.property('data');",
+									"    pm.expect(json.data).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Setiap pelanggan memiliki field yang sesuai', function () {",
+									"    var json = pm.response.json();",
+									"    if (json.data.length > 0) {",
+									"        json.data.forEach(function(customer) {",
+									"            pm.expect(customer).to.have.all.keys(",
+									"                'id', 'name', 'phone', 'email', 'address',",
+									"                'created_at', 'updated_at', 'vehicles_count', 'transactions_count'",
+									"            );",
+									"            pm.expect(customer.name).to.be.a('string');",
+									"            pm.expect(customer.phone).to.match(/^\\d{10,15}$/);",
+									"            pm.expect(customer.vehicles_count).to.be.a('number').that.is.at.least(0);",
+									"            pm.expect(customer.transactions_count).to.be.a('number').that.is.at.least(0);",
+									"        });",
+									"        console.log('Jumlah pelanggan:', json.data.length);",
+									"    } else {",
+									"        console.log('Tidak ada data pelanggan (array kosong).');",
+									"        pm.expect(json.data).to.be.empty;",
+									"    }",
+									"});",
+									"",
+									"pm.test('Data diurutkan berdasarkan nama (ascending)', function () {",
+									"    var json = pm.response.json();",
+									"    if (json.data.length > 1) {",
+									"        for (var i = 1; i < json.data.length; i++) {",
+									"            pm.expect(json.data[i].name.localeCompare(json.data[i-1].name)).to.be.at.least(0);",
+									"        }",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/customers",
+							"host": ["{{base_url}}"],
+							"path": ["api", "customers"]
+						},
+						"description": "Mendapatkan daftar semua pelanggan.\n\nSetiap data pelanggan menyertakan:\n- `vehicles_count`: jumlah kendaraan yang dimiliki\n- `transactions_count`: jumlah transaksi\n\nData diurutkan berdasarkan nama (ascending)."
+					},
+					"response": [
+						{
+							"name": "Daftar Pelanggan",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n    \"success\": true,\n    \"message\": \"Daftar pelanggan.\",\n    \"data\": [\n        {\n            \"id\": 1,\n            \"name\": \"Budi Santoso\",\n            \"phone\": \"081234567891\",\n            \"email\": \"budi@example.com\",\n            \"address\": \"Jl. Merdeka No. 1, Jakarta\",\n            \"created_at\": \"2026-07-20T06:35:00.000000Z\",\n            \"updated_at\": \"2026-07-20T06:35:00.000000Z\",\n            \"vehicles_count\": 2,\n            \"transactions_count\": 3\n        },\n        {\n            \"id\": 2,\n            \"name\": \"Siti Rahayu\",\n            \"phone\": \"081234567892\",\n            \"email\": \"siti@example.com\",\n            \"address\": \"Jl. Sudirman No. 10, Bandung\",\n            \"created_at\": \"2026-07-20T06:36:00.000000Z\",\n            \"updated_at\": \"2026-07-20T06:36:00.000000Z\",\n            \"vehicles_count\": 1,\n            \"transactions_count\": 1\n        }\n    ]\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Services",
+			"description": "Endpoint untuk mendapatkan data transaksi servis.",
+			"item": [
+				{
+					"name": "Get All Services",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code 200', function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"// Jika 401, langsung skip assertion data (token belum terisi)",
+									"if (pm.response.code === 401) {",
+									"    console.warn('⚠️ 401 Unauthenticated — pastikan Login sudah dijalankan atau token valid.');",
+									"    return;",
+									"}",
+									"",
+									"pm.test('Response format sukses', function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json).to.have.property('success', true);",
+									"    pm.expect(json).to.have.property('message', 'Daftar transaksi servis.');",
+									"    pm.expect(json).to.have.property('data');",
+									"    pm.expect(json.data).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Setiap data servis memiliki field utama', function () {",
+									"    var json = pm.response.json();",
+									"    if (json.data.length > 0) {",
+									"        json.data.forEach(function(service) {",
+									"            pm.expect(service).to.have.all.keys(",
+									"                'id', 'code', 'type', 'customer_id', 'vehicle_id', 'user_id',",
+									"                'date', 'description', 'total', 'status',",
+									"                'created_at', 'updated_at',",
+									"                'customer', 'vehicle', 'user'",
+									"            );",
+									"            pm.expect(service.type).to.eql('servis');",
+									"            pm.expect(service.code).to.match(/^SRV-/);",
+									"            pm.expect(service.total).to.match(/^\\d+\\.\\d{2}$/);",
+									"        });",
+									"        console.log('Jumlah servis:', json.data.length);",
+									"    } else {",
+									"        console.log('Tidak ada data servis (array kosong).');",
+									"        pm.expect(json.data).to.be.empty;",
+									"    }",
+									"});",
+									"",
+									"pm.test('Relasi customer, vehicle, dan user tersedia', function () {",
+									"    var json = pm.response.json();",
+									"    if (json.data.length > 0) {",
+									"        json.data.forEach(function(service) {",
+									"            pm.expect(service.customer).to.have.all.keys('id', 'name', 'phone');",
+									"            pm.expect(service.vehicle).to.have.all.keys('id', 'plate_number', 'brand', 'model');",
+									"            pm.expect(service.user).to.have.all.keys('id', 'name');",
+									"        });",
+									"    }",
+									"});",
+									"",
+									"pm.test('Data diurutkan berdasarkan tanggal (descending)', function () {",
+									"    var json = pm.response.json();",
+									"    if (json.data.length > 1) {",
+									"        for (var i = 1; i < json.data.length; i++) {",
+									"            pm.expect(json.data[i].date.localeCompare(json.data[i-1].date)).to.be.at.most(0);",
+									"        }",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Accept",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/services",
+							"host": ["{{base_url}}"],
+							"path": ["api", "services"]
+						},
+						"description": "Mendapatkan daftar semua transaksi servis.\n\nSetiap data menyertakan relasi:\n- `customer`: nama & no telepon\n- `vehicle`: plat nomor, brand, model\n- `user`: nama mekanik/admin\n\nData diurutkan berdasarkan tanggal terbaru."
+					},
+					"response": [
+						{
+							"name": "Daftar Servis",
+							"status": "OK",
+							"code": 200,
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"body": "{\n    \"success\": true,\n    \"message\": \"Daftar transaksi servis.\",\n    \"data\": [\n        {\n            \"id\": 1,\n            \"code\": \"SRV-20260720-0001\",\n            \"type\": \"servis\",\n            \"customer_id\": 1,\n            \"vehicle_id\": 1,\n            \"user_id\": 1,\n            \"date\": \"2026-07-20\",\n            \"description\": \"Ganti oli mesin dan filter\",\n            \"total\": \"250000.00\",\n            \"status\": \"selesai\",\n            \"created_at\": \"2026-07-20T06:40:00.000000Z\",\n            \"updated_at\": \"2026-07-20T06:45:00.000000Z\",\n            \"customer\": {\n                \"id\": 1,\n                \"name\": \"Budi Santoso\",\n                \"phone\": \"081234567891\"\n            },\n            \"vehicle\": {\n                \"id\": 1,\n                \"plate_number\": \"B 1234 ABC\",\n                \"brand\": \"Honda\",\n                \"model\": \"Vario 125\"\n            },\n            \"user\": {\n                \"id\": 1,\n                \"name\": \"Admin Bengkel\"\n            }\n        }\n    ]\n}"
+						}
+					]
+				}
+			]
+		}
+	]
+}
