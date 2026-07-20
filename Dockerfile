@@ -1,4 +1,4 @@
-FROM php:8.3-apache
+FROM php:8.4-apache
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libonig-dev \
@@ -19,7 +19,7 @@ RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-av
 
 WORKDIR /var/www/html
 COPY . .
-RUN composer install --no-dev --optimize-autoloader --no-interaction \
+RUN composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs \
  && chown -R www-data:www-data storage bootstrap/cache
 
 COPY .flazhost/supervisord.conf /etc/supervisor/conf.d/flazhost.conf
