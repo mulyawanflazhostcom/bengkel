@@ -32,7 +32,8 @@ ENV LOG_CHANNEL=stderr
 WORKDIR /var/www/html
 COPY . .
 
-RUN git config --global --add safe.directory /var/www/html \
+# git mungkin tidak terinstall di beberapa base image — skip kalau tidak ada
+RUN (command -v git >/dev/null 2>&1 && git config --global --add safe.directory /var/www/html || true) \
  && composer install --no-dev --no-scripts --optimize-autoloader --no-interaction --prefer-dist --no-progress \
  && chown -R www-data:www-data storage bootstrap/cache \
  && chmod -R 775 storage bootstrap/cache
