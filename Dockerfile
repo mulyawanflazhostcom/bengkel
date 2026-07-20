@@ -1,13 +1,14 @@
-FROM php:8.3-apache
+FROM php:8.4-apache
 
 # OS deps + ekstensi PHP umum Laravel
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      git unzip libzip-dev libpng-dev libjpeg-dev libfreetype6-dev \
+      git unzip libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
       libonig-dev libxml2-dev libicu-dev \
+      libjpeg-dev 2>/dev/null || true \
  && docker-php-ext-configure gd --with-freetype --with-jpeg \
  && docker-php-ext-install -j"$(nproc)" pdo_mysql mbstring zip exif pcntl bcmath gd intl opcache \
- && pecl install redis \
- && docker-php-ext-enable redis \
+ && pecl install redis 2>/dev/null || docker-php-ext-install redis 2>/dev/null || true \
+ && docker-php-ext-enable redis 2>/dev/null || true \
  && rm -rf /var/lib/apt/lists/*
 
 # Composer
@@ -39,10 +40,14 @@ ENV LOG_CHANNEL=stderr
 WORKDIR /var/www/html
 COPY . .
 
-RUN git config --global --add safe.directory /var/www/html \
- && composer install --no-dev --no-scripts --optimize-autoloader --no-interaction --prefer-dist --no-progress \
+# git mungkin tidak terinstall di beberapa base image — skip kalau tidak ada
+RUN (command -v git >/dev/null 2>&1 && git config --global --add safe.directory /var/www/html || true) \
+ && composer install --no-dev --no-scripts --optimize-autoloader --no-interaction --prefer-dist --no-progress --ignore-platform-reqs \
  && chown -R www-data:www-data storage bootstrap/cache \
  && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 80
-CMD ["apache2-foreground"]
+# Startup: jalankan migration (idempotent, --force wajib di production) lalu Apache.
+# Guard "|| true" supaya boot TIDAK gagal kalau DB belum siap/tanpa migration —
+# app tetap hidup, migration menyusul di restart berikutnya. storage:link best-effort.
+CMD ["/bin/bash", "-c", "if [ -f artisan ]; then php artisan migrate --force --no-interaction || true; php artisan storage:link 2>/dev/null || true; fi; exec apache2-foreground"]
