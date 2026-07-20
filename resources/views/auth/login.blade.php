@@ -7,7 +7,7 @@
     <div class="col-12 col-sm-8 col-md-6 col-lg-4">
         <div class="text-center mb-4">
             <i class="bi bi-wrench-adjustable-circle text-dark" style="font-size: 3rem;"></i>
-            <h1 class="h4 fw-bold mt-2">Bengkel Kita</h1>
+            <h1 class="h4 fw-bold mt-2">Bengkel UNTIRTA</h1>
             <p class="text-muted">Silakan login untuk melanjutkan</p>
         </div>
         <div class="card">
