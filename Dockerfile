@@ -1,28 +1,71 @@
 FROM php:8.3-apache
 
-RUN apt-get update \
- && apt-get install -y --no-install-recommends libonig-dev \
- && docker-php-ext-install -j"$(nproc)" bcmath mbstring \
- && apt-get clean && rm -rf /var/lib/apt/lists/*
+# OS deps + ekstensi PHP umum Laravel
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git unzip libzip-dev libpng-dev libjpeg62-turbo-dev libfreetype6-dev \
+      libonig-dev libxml2-dev libicu-dev \
+      libjpeg-dev 2>/dev/null || true \
+ && docker-php-ext-configure gd --with-freetype --with-jpeg \
+ && docker-php-ext-install -j"$(nproc)" pdo_mysql mbstring zip exif pcntl bcmath gd intl opcache \
+ && pecl install redis 2>/dev/null || docker-php-ext-install redis 2>/dev/null || true \
+ && docker-php-ext-enable redis 2>/dev/null || true \
+ && rm -rf /var/lib/apt/lists/*
 
-# Supervisor — runs web + queue worker + scheduler in a single container
+# Supervisor — web + queue worker + scheduler dalam satu container
 RUN apt-get update && apt-get install -y --no-install-recommends supervisor \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Laravel: docroot Apache diarahkan ke /public
+# Apache: DocumentRoot -> public/, mod_rewrite, dan FallbackResource supaya
+# semua route Laravel (selain /) diteruskan ke index.php tanpa perlu .htaccess.
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
- && sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf \
- && a2enmod rewrite
+RUN sed -ri 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
+      /etc/apache2/sites-available/*.conf /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf \
+ && a2enmod rewrite setenvif \
+ && printf '%s\n' \
+      '# Di belakang proxy TLS (CapRover): kenali HTTPS dari X-Forwarded-Proto supaya' \
+      '# PHP/Laravel generate URL & form action https:// (cegah warning "not secure").' \
+      'SetEnvIf X-Forwarded-Proto "https" HTTPS=on' \
+      '<Directory /var/www/html/public>' \
+      '    Options Indexes FollowSymLinks' \
+      '    AllowOverride All' \
+      '    Require all granted' \
+      '    FallbackResource /index.php' \
+      '</Directory>' \
+      > /etc/apache2/conf-available/flazhost-laravel.conf \
+ && a2enconf flazhost-laravel
+
+# PHP: memory_limit lebih besar (default 128M sering kurang untuk Laravel)
+RUN echo 'memory_limit=512M' > /usr/local/etc/php/conf.d/flazhost.ini
+
+# Laravel: log ke stderr supaya error terlihat di App Logs / Error Log UI.
+# Bisa di-override lewat env var app.
+ENV LOG_CHANNEL=stderr
 
 WORKDIR /var/www/html
 COPY . .
-RUN ( composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs || composer update --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs ) \
- && chown -R www-data:www-data storage bootstrap/cache
+
+# git mungkin tidak terinstall di beberapa base image — skip kalau tidak ada.
+# composer install = jalur utama (deterministik, pakai lock). Fallback ke
+# composer update kalau install gagal (lock basi / "lock file does not contain a
+# compatible set of packages" saat composer.json diubah tanpa composer-update),
+# supaya deploy tidak error hanya karena lock belum disinkron.
+RUN (command -v git >/dev/null 2>&1 && git config --global --add safe.directory /var/www/html || true) \
+ && ( composer install --no-dev --no-scripts --optimize-autoloader --no-interaction --prefer-dist --no-progress --ignore-platform-reqs \
+      || composer update --no-dev --no-scripts --optimize-autoloader --no-interaction --prefer-dist --no-progress --ignore-platform-reqs ) \
+ && chown -R www-data:www-data storage bootstrap/cache \
+ && chmod -R 775 storage bootstrap/cache
 
 COPY .flazhost/supervisord.conf /etc/supervisor/conf.d/flazhost.conf
 
 EXPOSE 80
-CMD ["supervisord", "-n", "-c", "/etc/supervisor/conf.d/flazhost.conf"]
+# Startup: migration + seed (auto-deteksi) lalu Apache.
+#  - migrate --force: terapkan migration (idempotent, --force wajib di production).
+#  - db:seed --force: auto-jalankan DatabaseSeeder KALAU ada isinya (default Laravel
+#    kosong = no-op). Guard "|| true" → seeder ber-unique-key gagal aman saat diulang
+#    (tidak menduplikat data, tidak menggagalkan boot). App tetap hidup walau DB
+#    sesaat belum siap; migration/seed menyusul di restart berikutnya.
+#  - storage:link best-effort.
+CMD ["/bin/bash", "-c", "if [ -f artisan ]; then php artisan migrate --force --no-interaction || true; php artisan db:seed --force --no-interaction || true; php artisan storage:link 2>/dev/null || true; fi; exec supervisord -n -c /etc/supervisor/conf.d/flazhost.conf"]
