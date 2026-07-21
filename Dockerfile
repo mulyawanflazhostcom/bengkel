@@ -11,10 +11,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && docker-php-ext-enable redis 2>/dev/null || true \
  && rm -rf /var/lib/apt/lists/*
 
-# Supervisor — web + queue worker + scheduler dalam satu container
-RUN apt-get update && apt-get install -y --no-install-recommends supervisor \
- && apt-get clean && rm -rf /var/lib/apt/lists/*
-
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -58,8 +54,6 @@ RUN (command -v git >/dev/null 2>&1 && git config --global --add safe.directory 
  && chown -R www-data:www-data storage bootstrap/cache \
  && chmod -R 775 storage bootstrap/cache
 
-COPY .flazhost/supervisord.conf /etc/supervisor/conf.d/flazhost.conf
-
 EXPOSE 80
 # Startup: migration + seed (auto-deteksi) lalu Apache.
 #  - migrate --force: terapkan migration (idempotent, --force wajib di production).
@@ -68,4 +62,4 @@ EXPOSE 80
 #    (tidak menduplikat data, tidak menggagalkan boot). App tetap hidup walau DB
 #    sesaat belum siap; migration/seed menyusul di restart berikutnya.
 #  - storage:link best-effort.
-CMD ["/bin/bash", "-c", "if [ -f artisan ]; then php artisan migrate --force --no-interaction || true; php artisan db:seed --force --no-interaction || true; php artisan storage:link 2>/dev/null || true; fi; exec supervisord -n -c /etc/supervisor/conf.d/flazhost.conf"]
+CMD ["/bin/bash", "-c", "if [ -f artisan ]; then php artisan migrate --force --no-interaction || true; php artisan db:seed --force --no-interaction || true; php artisan storage:link 2>/dev/null || true; fi; exec apache2-foreground"]
